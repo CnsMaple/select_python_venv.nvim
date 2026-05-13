@@ -29,6 +29,15 @@ function M.get_path()
   return finder.interpreter_path(chosen)
 end
 
+function M.show_path()
+  local path = M.get_path()
+  if path then
+    vim.notify("select_python_venv: " .. path, vim.log.levels.INFO)
+  else
+    vim.notify("select_python_venv: no venv configured", vim.log.levels.WARN)
+  end
+end
+
 function M.select_path()
   local venvs = finder.find_venvs()
   if #venvs == 0 then
