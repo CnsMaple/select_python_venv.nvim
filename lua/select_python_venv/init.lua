@@ -90,8 +90,9 @@ function M.restart_lsp()
 
     elseif client.name == "ty" then
       settings.ty = settings.ty or {}
-      settings.ty.environment = settings.ty.environment or {}
-      settings.ty.environment.python = python_path
+      settings.ty.configuration = settings.ty.configuration or {}
+      settings.ty.configuration.environment = settings.ty.configuration.environment or {}
+      settings.ty.configuration.environment.python = python_path
       pcall(client.notify, client, "workspace/didChangeConfiguration", {
         settings = settings,
       })
