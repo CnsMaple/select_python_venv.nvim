@@ -33,9 +33,8 @@ function M.setup(opts)
     return
   end
   vim.schedule(function()
-    local root = get_venv_root()
-    if root then
-      vim.notify("select_python_venv: auto-applied " .. vim.fn.fnamemodify(root, ":t"), vim.log.levels.INFO)
+    if get_venv_root() then
+      M.restart_lsp()
     end
   end)
 end
