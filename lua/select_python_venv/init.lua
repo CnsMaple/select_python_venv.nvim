@@ -11,12 +11,12 @@ function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config or {}, opts or {})
 end
 
-function M.get_path()
+local function get_venv_root()
   local cwd = normalize(vim.fn.getcwd())
   local stored = persist.get_stored(cwd)
 
   if stored and vim.fn.isdirectory(stored) == 1 then
-    return finder.interpreter_path(stored)
+    return stored
   end
 
   local venvs = finder.find_venvs()
@@ -26,7 +26,23 @@ function M.get_path()
 
   local chosen = venvs[1]
   persist.set_stored(cwd, chosen)
-  return finder.interpreter_path(chosen)
+  return chosen
+end
+
+function M.get_path()
+  local root = get_venv_root()
+  if root then
+    return finder.interpreter_path(root)
+  end
+  return nil
+end
+
+function M.get_venv_name()
+  local root = get_venv_root()
+  if root then
+    return vim.fn.fnamemodify(root, ":t")
+  end
+  return nil
 end
 
 function M.show_path()
