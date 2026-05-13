@@ -29,7 +29,7 @@ local function get_venv_root()
   return chosen
 end
 
-function M.get_path()
+function M.get_venv_path()
   local root = get_venv_root()
   if root then
     return finder.interpreter_path(root)
@@ -46,7 +46,7 @@ function M.get_venv_name()
 end
 
 function M.show_path()
-  local path = M.get_path()
+  local path = M.get_venv_path()
   if path then
     vim.notify("select_python_venv: " .. path, vim.log.levels.INFO)
   else
@@ -55,7 +55,7 @@ function M.show_path()
 end
 
 function M.restart_lsp()
-  local python_path = M.get_path()
+  local python_path = M.get_venv_path()
   if not python_path then
     vim.notify("select_python_venv: no venv configured for this project", vim.log.levels.WARN)
     return
@@ -77,6 +77,7 @@ function M.restart_lsp()
         settings = settings,
       })
       count = count + 1
+      vim.notify("select_python_venv: updated pyright LSP", vim.log.levels.INFO)
 
     elseif client.name == "basedpyright" then
       settings.basedpyright = settings.basedpyright or {}
@@ -85,6 +86,7 @@ function M.restart_lsp()
         settings = settings,
       })
       count = count + 1
+      vim.notify("select_python_venv: updated basedpyright LSP", vim.log.levels.INFO)
 
     elseif client.name == "ty" then
       settings.ty = settings.ty or {}
@@ -94,6 +96,7 @@ function M.restart_lsp()
         settings = settings,
       })
       count = count + 1
+      vim.notify("select_python_venv: updated ty LSP", vim.log.levels.INFO)
     end
   end
 
