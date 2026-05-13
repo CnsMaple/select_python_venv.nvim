@@ -64,62 +64,40 @@ function M.restart_lsp()
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   local count = 0
   for _, client in ipairs(clients) do
-    local settings = client.config.settings
-    if not settings then
-      settings = {}
-      client.config.settings = settings
+    local config
+    if client.name == "pyright" then
+      config = { settings = { pyright = { pythonPath = python_path } } }
+    elseif client.name == "basedpyright" then
+      config = { settings = { basedpyright = { pythonPath = python_path } } }
+    elseif client.name == "ty" then
+      config = { settings = { ty = { configuration = { environment = { python = python_path } } } } }
+    elseif client.name == "ruff" then
+      config = { init_options = { settings = { interpreter = { python_path } } } }
     end
 
-    if client.name == "pyright" then
-      settings.pyright = settings.pyright or {}
-      settings.pyright.pythonPath = python_path
-      pcall(client.notify, client, "workspace/didChangeConfiguration", {
-        settings = settings,
-      })
+    if config then
+      pcall(vim.lsp.config, client.name, config)
+      vim.lsp.stop_client(client.id)
+      vim.schedule(function()
+        pcall(function()
+          local new_config = vim.lsp.config(client.name)
+          if new_config then
+            vim.lsp.start(new_config, { bufnr = 0 })
+          end
+        end)
+      end)
       count = count + 1
-      vim.notify("select_python_venv: updated pyright LSP", vim.log.levels.INFO)
-
-    elseif client.name == "basedpyright" then
-      settings.basedpyright = settings.basedpyright or {}
-      settings.basedpyright.pythonPath = python_path
-      pcall(client.notify, client, "workspace/didChangeConfiguration", {
-        settings = settings,
-      })
-      count = count + 1
-      vim.notify("select_python_venv: updated basedpyright LSP", vim.log.levels.INFO)
-
-    elseif client.name == "ty" then
-      settings.ty = settings.ty or {}
-      settings.ty.configuration = settings.ty.configuration or {}
-      settings.ty.configuration.environment = settings.ty.configuration.environment or {}
-      settings.ty.configuration.environment.python = python_path
-      pcall(client.notify, client, "workspace/didChangeConfiguration", {
-        settings = settings,
-      })
-      count = count + 1
-      vim.notify("select_python_venv: updated ty LSP", vim.log.levels.INFO)
-
-    elseif client.name == "ruff" then
-      settings.init_options = settings.init_options or {}
-      settings.init_options.settings = settings.init_options.settings or {}
-      settings.init_options.settings.interpreter = { python_path }
-      pcall(client.notify, client, "workspace/didChangeConfiguration", {
-        settings = settings,
-      })
-      count = count + 1
-      vim.notify("select_python_venv: updated ruff LSP", vim.log.levels.INFO)
+      vim.notify("select_python_venv: restarted " .. client.name .. " LSP", vim.log.levels.INFO)
     end
   end
 
   if count == 0 then
     local names = vim.tbl_map(function(c) return c.name end, clients)
     if #names > 0 then
-      vim.notify("select_python_venv: no python LSP settings found in active clients: " .. table.concat(names, ", "), vim.log.levels.INFO)
+      vim.notify("select_python_venv: no python LSP client active in this buffer: " .. table.concat(names, ", "), vim.log.levels.INFO)
     else
       vim.notify("select_python_venv: no LSP client active in this buffer", vim.log.levels.INFO)
     end
-  else
-    vim.notify("select_python_venv: sent config update to " .. count .. " LSP client(s)", vim.log.levels.INFO)
   end
 end
 
