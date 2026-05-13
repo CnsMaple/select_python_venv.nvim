@@ -45,33 +45,34 @@ function M.restart_lsp()
     return
   end
 
+  local python_servers = { "pyright", "basedpyright", "ty", "ruff" }
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   local count = 0
   for _, client in ipairs(clients) do
-    local settings = client.config.settings
-    if not settings then
-      -- no settings to update
+    if not vim.tbl_contains(python_servers, client.name) then
+      -- skip non-python LSP clients
     else
-      local ok
-
-      if settings.python then
-        settings.python.pythonPath = python_path
-        ok = true
+      local settings = client.config.settings
+      if not settings then
+        settings = {}
+        client.config.settings = settings
       end
 
-      for _, value in pairs(settings) do
-        if type(value) == "table" and value.environment then
-          value.environment.python = python_path
-          ok = true
-        end
-      end
+      settings.python = settings.python or {}
+      settings.python.pythonPath = python_path
 
-      if ok then
-        pcall(client.notify, client, "workspace/didChangeConfiguration", {
-          settings = settings,
-        })
-        count = count + 1
+      local server_settings = settings[client.name]
+      if not server_settings then
+        server_settings = {}
+        settings[client.name] = server_settings
       end
+      server_settings.environment = server_settings.environment or {}
+      server_settings.environment.python = python_path
+
+      pcall(client.notify, client, "workspace/didChangeConfiguration", {
+        settings = settings,
+      })
+      count = count + 1
     end
   end
 
