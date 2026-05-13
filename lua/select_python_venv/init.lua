@@ -76,18 +76,20 @@ function M.restart_lsp()
     end
 
     if config then
-      pcall(vim.lsp.config, client.name, config)
-      vim.lsp.stop_client(client.id)
+      local name = client.name
+      local id = client.id
+      vim.lsp.config[name] = vim.tbl_deep_extend("force", vim.lsp.config[name] or {}, config)
+      local c = vim.lsp.get_client_by_id(id)
+      if c then
+        c:stop()
+      end
       vim.schedule(function()
-        pcall(function()
-          local new_config = vim.lsp.config(client.name)
-          if new_config then
-            vim.lsp.start(new_config, { bufnr = 0 })
-          end
-        end)
+        local ok = pcall(vim.lsp.start, vim.lsp.config[name])
+        if ok then
+          vim.notify("select_python_venv: restarted " .. name .. " LSP", vim.log.levels.INFO)
+        end
       end)
       count = count + 1
-      vim.notify("select_python_venv: restarted " .. client.name .. " LSP", vim.log.levels.INFO)
     end
   end
 
