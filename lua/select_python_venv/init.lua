@@ -97,6 +97,14 @@ function M.restart_lsp()
       })
       count = count + 1
       vim.notify("select_python_venv: updated ty LSP", vim.log.levels.INFO)
+
+    elseif client.name == "ruff" then
+      settings.interpreter = { python_path }
+      pcall(client.notify, client, "workspace/didChangeConfiguration", {
+        settings = settings,
+      })
+      count = count + 1
+      vim.notify("select_python_venv: updated ruff LSP", vim.log.levels.INFO)
     end
   end
 
