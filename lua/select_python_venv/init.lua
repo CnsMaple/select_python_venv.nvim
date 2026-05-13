@@ -87,29 +87,29 @@ function M.restart_lsp()
   }
 
   for name, config in pairs(server_configs) do
-    vim.lsp.config[name] = vim.tbl_deep_extend("force", vim.lsp.config[name] or {}, config)
+    if vim.lsp.config[name] then
+      vim.lsp.config[name] = vim.tbl_deep_extend("force", vim.lsp.config[name], config)
+    end
   end
-  vim.notify("select_python_venv: configured pyright, basedpyright, ty, ruff", vim.log.levels.INFO)
 
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   local restarted = 0
   for _, client in ipairs(clients) do
     local name = client.name
-    if server_configs[name] then
-      local c = vim.lsp.get_client_by_id(client.id)
-      if c then
-        c:stop()
-        vim.schedule(function()
-          pcall(vim.lsp.start, vim.lsp.config[name])
-        end)
-        restarted = restarted + 1
-        vim.notify("select_python_venv: restarted " .. name, vim.log.levels.INFO)
-      end
+    local extra = server_configs[name]
+    if extra then
+      local merged = vim.tbl_deep_extend("force", client.config, extra)
+      client:stop()
+      vim.schedule(function()
+        pcall(vim.lsp.start, merged)
+      end)
+      restarted = restarted + 1
+      vim.notify("select_python_venv: restarted " .. name, vim.log.levels.INFO)
     end
   end
 
-  if restarted == 0 and #clients > 0 then
-    vim.notify("select_python_venv: (no python LSP running yet, will apply on next start)", vim.log.levels.INFO)
+  if restarted == 0 then
+    vim.notify("select_python_venv: configured for future LSP starts", vim.log.levels.INFO)
   end
 end
 
