@@ -9,47 +9,70 @@ end
 
 M.config = { auto_detect = true }
 
-local applied_clients = {}
+local function extra_for(name, python_path)
+  if name == "pyright" then
+    return { settings = { pyright = { pythonPath = python_path } } }
+  elseif name == "basedpyright" then
+    return { settings = { basedpyright = { pythonPath = python_path } } }
+  elseif name == "ty" then
+    return { settings = { ty = { configuration = { environment = { python = python_path } } } } }
+  elseif name == "ruff" then
+    return { init_options = { settings = { interpreter = { python_path } } } }
+  end
+end
+
+local function config_has_path(client, python_path)
+  return vim.inspect(client.config):find(vim.pesc(python_path)) ~= nil
+end
 
 vim.api.nvim_create_autocmd("LspAttach", {
-  desc = "Apply select_python_venv path to Python LSP clients on start",
+  desc = "Ensure Python LSP clients are using the venv interpreter",
   callback = function(args)
-    if applied_clients[args.data.client_id] then
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if not client then
       return
     end
-    applied_clients[args.data.client_id] = true
 
     local python_path = M.get_venv_path()
     if not python_path then
       return
     end
 
-    local client = vim.lsp.get_client_by_id(args.data.client_id)
-    if not client then
+    local extra = extra_for(client.name, python_path)
+    if not extra then
       return
     end
 
-    local extra
-    if client.name == "pyright" then
-      extra = { settings = { pyright = { pythonPath = python_path } } }
-    elseif client.name == "basedpyright" then
-      extra = { settings = { basedpyright = { pythonPath = python_path } } }
-    elseif client.name == "ty" then
-      extra = { settings = { ty = { configuration = { environment = { python = python_path } } } } }
-    elseif client.name == "ruff" then
-      extra = { init_options = { settings = { interpreter = { python_path } } } }
+    -- Already configured by the vim.lsp.start wrapper; nothing to do
+    if config_has_path(client, python_path) then
+      return
     end
 
-    if extra then
-      client.config = vim.tbl_deep_extend("force", client.config, extra)
-      if client.config.settings then
-        pcall(client.notify, client, "workspace/didChangeConfiguration", {
-          settings = client.config.settings,
-        })
-      end
+    -- This client missed our wrapper; restart it now (it has been running
+    -- for a while so stop is safe)
+    local merged = vim.tbl_deep_extend("force", client.config, extra)
+    if not client.is_stopped() then
+      client:stop()
     end
+    vim.schedule(function()
+      pcall(vim.lsp.start, merged)
+    end)
+    vim.notify("select_python_venv: configured " .. client.name, vim.log.levels.INFO)
   end,
 })
+
+local original_start = vim.lsp.start
+vim.lsp.start = function(config, opts)
+  config = config or {}
+  local python_path = M.get_venv_path()
+  if python_path then
+    local extra = extra_for(config.name, python_path)
+    if extra then
+      config = vim.tbl_deep_extend("force", config, extra)
+    end
+  end
+  return original_start(config, opts)
+end
 
 local function get_venv_root()
   local cwd = normalize(vim.fn.getcwd())
@@ -121,32 +144,38 @@ function M.restart_lsp()
     return
   end
 
-  local server_configs = {
-    pyright = { settings = { pyright = { pythonPath = python_path } } },
-    basedpyright = { settings = { basedpyright = { pythonPath = python_path } } },
-    ty = { settings = { ty = { configuration = { environment = { python = python_path } } } } },
-    ruff = { init_options = { settings = { interpreter = { python_path } } } },
-  }
-
-  for name, config in pairs(server_configs) do
+  for name, _ in pairs({
+    pyright = true,
+    basedpyright = true,
+    ty = true,
+    ruff = true,
+  }) do
     if vim.lsp.config[name] then
-      vim.lsp.config[name] = vim.tbl_deep_extend("force", vim.lsp.config[name], config)
+      local extra = extra_for(name, python_path)
+      if extra then
+        vim.lsp.config[name] = vim.tbl_deep_extend("force", vim.lsp.config[name], extra)
+      end
     end
   end
 
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   local restarted = 0
   for _, client in ipairs(clients) do
-    local name = client.name
-    local extra = server_configs[name]
+    local extra = extra_for(client.name, python_path)
     if extra then
-      local merged = vim.tbl_deep_extend("force", client.config, extra)
-      client:stop()
-      vim.schedule(function()
-        pcall(vim.lsp.start, merged)
-      end)
-      restarted = restarted + 1
-      vim.notify("select_python_venv: restarted " .. name, vim.log.levels.INFO)
+      if config_has_path(client, python_path) then
+        restarted = restarted + 1
+      else
+        local merged = vim.tbl_deep_extend("force", client.config, extra)
+        if not client.is_stopped() then
+          client:stop()
+        end
+        vim.schedule(function()
+          pcall(vim.lsp.start, merged)
+        end)
+        restarted = restarted + 1
+        vim.notify("select_python_venv: restarted " .. client.name, vim.log.levels.INFO)
+      end
     end
   end
 
