@@ -79,45 +79,37 @@ function M.restart_lsp()
     return
   end
 
-  local clients = vim.lsp.get_clients({ bufnr = 0 })
-  local count = 0
-  for _, client in ipairs(clients) do
-    local config
-    if client.name == "pyright" then
-      config = { settings = { pyright = { pythonPath = python_path } } }
-    elseif client.name == "basedpyright" then
-      config = { settings = { basedpyright = { pythonPath = python_path } } }
-    elseif client.name == "ty" then
-      config = { settings = { ty = { configuration = { environment = { python = python_path } } } } }
-    elseif client.name == "ruff" then
-      config = { init_options = { settings = { interpreter = { python_path } } } }
-    end
+  local server_configs = {
+    pyright = { settings = { pyright = { pythonPath = python_path } } },
+    basedpyright = { settings = { basedpyright = { pythonPath = python_path } } },
+    ty = { settings = { ty = { configuration = { environment = { python = python_path } } } } },
+    ruff = { init_options = { settings = { interpreter = { python_path } } } },
+  }
 
-    if config then
-      local name = client.name
-      local id = client.id
-      vim.lsp.config[name] = vim.tbl_deep_extend("force", vim.lsp.config[name] or {}, config)
-      local c = vim.lsp.get_client_by_id(id)
+  for name, config in pairs(server_configs) do
+    vim.lsp.config[name] = vim.tbl_deep_extend("force", vim.lsp.config[name] or {}, config)
+  end
+  vim.notify("select_python_venv: configured pyright, basedpyright, ty, ruff", vim.log.levels.INFO)
+
+  local clients = vim.lsp.get_clients({ bufnr = 0 })
+  local restarted = 0
+  for _, client in ipairs(clients) do
+    local name = client.name
+    if server_configs[name] then
+      local c = vim.lsp.get_client_by_id(client.id)
       if c then
         c:stop()
+        vim.schedule(function()
+          pcall(vim.lsp.start, vim.lsp.config[name])
+        end)
+        restarted = restarted + 1
+        vim.notify("select_python_venv: restarted " .. name, vim.log.levels.INFO)
       end
-      vim.schedule(function()
-        local ok = pcall(vim.lsp.start, vim.lsp.config[name])
-        if ok then
-          vim.notify("select_python_venv: restarted " .. name .. " LSP", vim.log.levels.INFO)
-        end
-      end)
-      count = count + 1
     end
   end
 
-  if count == 0 then
-    local names = vim.tbl_map(function(c) return c.name end, clients)
-    if #names > 0 then
-      vim.notify("select_python_venv: no python LSP client active in this buffer: " .. table.concat(names, ", "), vim.log.levels.INFO)
-    else
-      vim.notify("select_python_venv: no LSP client active in this buffer", vim.log.levels.INFO)
-    end
+  if restarted == 0 and #clients > 0 then
+    vim.notify("select_python_venv: (no python LSP running yet, will apply on next start)", vim.log.levels.INFO)
   end
 end
 
