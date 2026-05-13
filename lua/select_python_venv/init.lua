@@ -31,9 +31,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
     local extra
     if client.name == "pyright" then
-      extra = { settings = { pyright = { pythonPath = python_path } } }
+      extra = { settings = { pyright = { pythonPath = python_path }, python = { pythonPath = python_path } } }
     elseif client.name == "basedpyright" then
-      extra = { settings = { basedpyright = { pythonPath = python_path } } }
+      extra = { settings = { basedpyright = { pythonPath = python_path }, python = { pythonPath = python_path } } }
     elseif client.name == "ty" then
       extra = { settings = { ty = { configuration = { environment = { python = python_path } } } } }
     elseif client.name == "ruff" then
@@ -122,8 +122,8 @@ function M.restart_lsp()
   end
 
   local server_configs = {
-    pyright = { settings = { pyright = { pythonPath = python_path } } },
-    basedpyright = { settings = { basedpyright = { pythonPath = python_path } } },
+    pyright = { settings = { pyright = { pythonPath = python_path }, python = { pythonPath = python_path } } },
+    basedpyright = { settings = { basedpyright = { pythonPath = python_path }, python = { pythonPath = python_path } } },
     ty = { settings = { ty = { configuration = { environment = { python = python_path } } } } },
     ruff = { init_options = { settings = { interpreter = { python_path } } } },
   }
@@ -135,22 +135,20 @@ function M.restart_lsp()
   end
 
   local clients = vim.lsp.get_clients({ bufnr = 0 })
-  local restarted = 0
+  local updated = 0
   for _, client in ipairs(clients) do
-    local name = client.name
-    local extra = server_configs[name]
+    local extra = server_configs[client.name]
     if extra then
-      local merged = vim.tbl_deep_extend("force", client.config, extra)
-      client:stop()
-      vim.schedule(function()
-        pcall(vim.lsp.start, merged)
-      end)
-      restarted = restarted + 1
-      vim.notify("select_python_venv: restarted " .. name, vim.log.levels.INFO)
+      client.config = vim.tbl_deep_extend("force", client.config, extra)
+      pcall(client.notify, client, "workspace/didChangeConfiguration", {
+        settings = client.config.settings,
+      })
+      updated = updated + 1
+      vim.notify("select_python_venv: updated " .. client.name, vim.log.levels.INFO)
     end
   end
 
-  if restarted == 0 then
+  if updated == 0 then
     vim.notify("select_python_venv: configured for future LSP starts", vim.log.levels.INFO)
   end
 end
