@@ -48,17 +48,31 @@ function M.restart_lsp()
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   local count = 0
   for _, client in ipairs(clients) do
-    if client.name:match("^py") or client.name:match("jedi") then
-      if client.config.settings then
-        client.config.settings = vim.tbl_deep_extend("force",
-          client.config.settings,
-          { python = { pythonPath = python_path } }
-        )
+    if not (client.name:match("^py") or client.name:match("jedi") or client.name == "ty") then
+      -- skip non-python LSP clients
+    else
+      local settings = client.config.settings
+      if settings then
+        local ok
+
+        if settings.python then
+          settings.python.pythonPath = python_path
+          ok = true
+        end
+
+        local server_key = settings[client.name]
+        if server_key and type(server_key) == "table" and server_key.environment then
+          server_key.environment.python = python_path
+          ok = true
+        end
+
+        if ok then
+          pcall(client.notify, client, "workspace/didChangeConfiguration", {
+            settings = settings,
+          })
+          count = count + 1
+        end
       end
-      pcall(client.notify, client, "workspace/didChangeConfiguration", {
-        settings = client.config.settings or vim.empty_dict(),
-      })
-      count = count + 1
     end
   end
 
