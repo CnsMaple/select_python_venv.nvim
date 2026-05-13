@@ -38,6 +38,37 @@ function M.show_path()
   end
 end
 
+function M.restart_lsp()
+  local python_path = M.get_path()
+  if not python_path then
+    vim.notify("select_python_venv: no venv configured for this project", vim.log.levels.WARN)
+    return
+  end
+
+  local clients = vim.lsp.get_clients({ bufnr = 0 })
+  local count = 0
+  for _, client in ipairs(clients) do
+    if client.name:match("^py") or client.name:match("jedi") then
+      if client.config.settings then
+        client.config.settings = vim.tbl_deep_extend("force",
+          client.config.settings,
+          { python = { pythonPath = python_path } }
+        )
+      end
+      pcall(client.notify, client, "workspace/didChangeConfiguration", {
+        settings = client.config.settings or vim.empty_dict(),
+      })
+      count = count + 1
+    end
+  end
+
+  if count == 0 then
+    vim.notify("select_python_venv: no python LSP client active in this buffer", vim.log.levels.INFO)
+  else
+    vim.notify("select_python_venv: sent config update to " .. count .. " LSP client(s)", vim.log.levels.INFO)
+  end
+end
+
 function M.select_path()
   local venvs = finder.find_venvs()
   if #venvs == 0 then
@@ -61,6 +92,7 @@ function M.select_path()
     if choice then
       persist.set_stored(cwd, choice.path)
       vim.notify('select_python_venv: set to ' .. choice.label, vim.log.levels.INFO)
+      M.restart_lsp()
     end
   end)
 end
