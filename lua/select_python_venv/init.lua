@@ -45,30 +45,35 @@ function M.restart_lsp()
     return
   end
 
-  local python_servers = { "pyright", "basedpyright", "ty", "ruff" }
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   local count = 0
   for _, client in ipairs(clients) do
-    if not vim.tbl_contains(python_servers, client.name) then
-      -- skip non-python LSP clients
-    else
-      local settings = client.config.settings
-      if not settings then
-        settings = {}
-        client.config.settings = settings
-      end
+    local settings = client.config.settings
+    if not settings then
+      settings = {}
+      client.config.settings = settings
+    end
 
-      settings.python = settings.python or {}
-      settings.python.pythonPath = python_path
+    if client.name == "pyright" then
+      settings.pyright = settings.pyright or {}
+      settings.pyright.pythonPath = python_path
+      pcall(client.notify, client, "workspace/didChangeConfiguration", {
+        settings = settings,
+      })
+      count = count + 1
 
-      local server_settings = settings[client.name]
-      if not server_settings then
-        server_settings = {}
-        settings[client.name] = server_settings
-      end
-      server_settings.environment = server_settings.environment or {}
-      server_settings.environment.python = python_path
+    elseif client.name == "basedpyright" then
+      settings.basedpyright = settings.basedpyright or {}
+      settings.basedpyright.pythonPath = python_path
+      pcall(client.notify, client, "workspace/didChangeConfiguration", {
+        settings = settings,
+      })
+      count = count + 1
 
+    elseif client.name == "ty" then
+      settings.ty = settings.ty or {}
+      settings.ty.environment = settings.ty.environment or {}
+      settings.ty.environment.python = python_path
       pcall(client.notify, client, "workspace/didChangeConfiguration", {
         settings = settings,
       })
