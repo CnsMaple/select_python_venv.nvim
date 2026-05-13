@@ -9,19 +9,6 @@ end
 
 M.config = { auto_detect = true }
 
-function M.setup(opts)
-  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
-  if not M.config.auto_detect then
-    return
-  end
-  vim.schedule(function()
-    local root = get_venv_root()
-    if root then
-      vim.notify("select_python_venv: auto-applied " .. vim.fn.fnamemodify(root, ":t"), vim.log.levels.INFO)
-    end
-  end)
-end
-
 local function get_venv_root()
   local cwd = normalize(vim.fn.getcwd())
   local stored = persist.get_stored(cwd)
@@ -38,6 +25,19 @@ local function get_venv_root()
   local chosen = venvs[1]
   persist.set_stored(cwd, chosen)
   return chosen
+end
+
+function M.setup(opts)
+  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+  if not M.config.auto_detect then
+    return
+  end
+  vim.schedule(function()
+    local root = get_venv_root()
+    if root then
+      vim.notify("select_python_venv: auto-applied " .. vim.fn.fnamemodify(root, ":t"), vim.log.levels.INFO)
+    end
+  end)
 end
 
 function M.get_venv_path()
