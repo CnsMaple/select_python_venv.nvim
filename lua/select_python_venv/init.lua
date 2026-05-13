@@ -48,36 +48,39 @@ function M.restart_lsp()
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   local count = 0
   for _, client in ipairs(clients) do
-    if not (client.name:match("^py") or client.name:match("jedi") or client.name == "ty") then
-      -- skip non-python LSP clients
+    local settings = client.config.settings
+    if not settings then
+      -- no settings to update
     else
-      local settings = client.config.settings
-      if settings then
-        local ok
+      local ok
 
-        if settings.python then
-          settings.python.pythonPath = python_path
-          ok = true
-        end
+      if settings.python then
+        settings.python.pythonPath = python_path
+        ok = true
+      end
 
-        local server_key = settings[client.name]
-        if server_key and type(server_key) == "table" and server_key.environment then
-          server_key.environment.python = python_path
-          ok = true
-        end
+      local server_key = settings[client.name]
+      if server_key and type(server_key) == "table" and server_key.environment then
+        server_key.environment.python = python_path
+        ok = true
+      end
 
-        if ok then
-          pcall(client.notify, client, "workspace/didChangeConfiguration", {
-            settings = settings,
-          })
-          count = count + 1
-        end
+      if ok then
+        pcall(client.notify, client, "workspace/didChangeConfiguration", {
+          settings = settings,
+        })
+        count = count + 1
       end
     end
   end
 
   if count == 0 then
-    vim.notify("select_python_venv: no python LSP client active in this buffer", vim.log.levels.INFO)
+    local names = vim.tbl_map(function(c) return c.name end, clients)
+    if #names > 0 then
+      vim.notify("select_python_venv: no python LSP settings found in active clients: " .. table.concat(names, ", "), vim.log.levels.INFO)
+    else
+      vim.notify("select_python_venv: no LSP client active in this buffer", vim.log.levels.INFO)
+    end
   else
     vim.notify("select_python_venv: sent config update to " .. count .. " LSP client(s)", vim.log.levels.INFO)
   end
