@@ -9,6 +9,12 @@ end
 
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config or {}, opts or {})
+  vim.schedule(function()
+    local root = get_venv_root()
+    if root then
+      vim.notify("select_python_venv: auto-applied " .. vim.fn.fnamemodify(root, ":t"), vim.log.levels.INFO)
+    end
+  end)
 end
 
 local function get_venv_root()
