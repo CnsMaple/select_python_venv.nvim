@@ -7,8 +7,13 @@ local function normalize(path)
   return path:gsub("\\", "/")
 end
 
+M.config = { auto_detect = true }
+
 function M.setup(opts)
-  M.config = vim.tbl_deep_extend("force", M.config or {}, opts or {})
+  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+  if not M.config.auto_detect then
+    return
+  end
   vim.schedule(function()
     local root = get_venv_root()
     if root then
@@ -49,6 +54,14 @@ function M.get_venv_name()
     return vim.fn.fnamemodify(root, ":t")
   end
   return nil
+end
+
+function M.clear_venv()
+  local cwd = normalize(vim.fn.getcwd())
+  local data = persist.load()
+  data[cwd] = nil
+  persist.save(data)
+  vim.notify("select_python_venv: cleared for this project, using system python", vim.log.levels.INFO)
 end
 
 function M.show_path()
