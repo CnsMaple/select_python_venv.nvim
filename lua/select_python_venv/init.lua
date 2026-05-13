@@ -9,6 +9,48 @@ end
 
 M.config = { auto_detect = true }
 
+local applied_clients = {}
+
+vim.api.nvim_create_autocmd("LspAttach", {
+  desc = "Apply select_python_venv path to Python LSP clients on start",
+  callback = function(args)
+    if applied_clients[args.data.client_id] then
+      return
+    end
+    applied_clients[args.data.client_id] = true
+
+    local python_path = M.get_venv_path()
+    if not python_path then
+      return
+    end
+
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if not client then
+      return
+    end
+
+    local extra
+    if client.name == "pyright" then
+      extra = { settings = { pyright = { pythonPath = python_path } } }
+    elseif client.name == "basedpyright" then
+      extra = { settings = { basedpyright = { pythonPath = python_path } } }
+    elseif client.name == "ty" then
+      extra = { settings = { ty = { configuration = { environment = { python = python_path } } } } }
+    elseif client.name == "ruff" then
+      extra = { init_options = { settings = { interpreter = { python_path } } } }
+    end
+
+    if extra then
+      client.config = vim.tbl_deep_extend("force", client.config, extra)
+      if client.config.settings then
+        pcall(client.notify, client, "workspace/didChangeConfiguration", {
+          settings = client.config.settings,
+        })
+      end
+    end
+  end,
+})
+
 local function get_venv_root()
   local cwd = normalize(vim.fn.getcwd())
   local stored = persist.get_stored(cwd)
