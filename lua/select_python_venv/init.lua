@@ -59,10 +59,11 @@ function M.restart_lsp()
         ok = true
       end
 
-      local server_key = settings[client.name]
-      if server_key and type(server_key) == "table" and server_key.environment then
-        server_key.environment.python = python_path
-        ok = true
+      for _, value in pairs(settings) do
+        if type(value) == "table" and value.environment then
+          value.environment.python = python_path
+          ok = true
+        end
       end
 
       if ok then
